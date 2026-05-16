@@ -1,7 +1,10 @@
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.routers import api_router
+from app.core.exceptions import global_exception_handler, validation_exception_handler
 from app.core.logger import AffordmedLogger
 
 app = FastAPI(
@@ -11,7 +14,27 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# ---------------------------------------------------------------------------
+# CORS — permissive during development; tighten allow_origins for production.
+# ---------------------------------------------------------------------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
+# ---------------------------------------------------------------------------
+# Exception handlers
+# ---------------------------------------------------------------------------
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(Exception, global_exception_handler)
+
+
+# ---------------------------------------------------------------------------
+# Request logging middleware
+# ---------------------------------------------------------------------------
 @app.middleware("http")
 async def request_logging_middleware(request: Request, call_next):
     """
