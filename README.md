@@ -7,34 +7,31 @@ An enterprise-grade, high-throughput microservices backend engineered with **Pyt
 ## 🏗️ Architectural Topology
 
 ```
-                         ┌─────────────────────────────────────────┐
-                         │           ASGI Server (Uvicorn)         │
-                         └──────────────────┬──────────────────────┘
-                                            │
-                         ┌──────────────────▼──────────────────────┐
-                         │         CORSMiddleware  (Layer 1)        │
-                         │   Preflight orchestration & origin guard │
-                         └──────────────────┬──────────────────────┘
-                                            │
-                         ┌──────────────────▼──────────────────────┐
-                         │    Request Logging Middleware (Layer 2)  │
-                         │  Fire-and-forget telemetry via httpx     │
-                         │         AffordmedLogger ──► POST /log    │
-                         └──────────────────┬──────────────────────┘
-                                            │
-                    ┌───────────────────────▼────────────────────────┐
-                    │              FastAPI Router  /api               │
-                    │  ┌────────────┐ ┌─────────────┐ ┌──────────┐  │
-                    │  │GET /depots │ │GET /vehicles│ │GET /notifs│  │
-                    │  └────────────┘ └─────────────┘ └──────────┘  │
-                    │                   Pydantic Validation Layer     │
-                    └────────────────────────────────────────────────┘
-                                            │
-                    ┌───────────────────────▼────────────────────────┐
-                    │           Global Exception Handlers             │
-                    │   RequestValidationError → 400 Bad Request      │
-                    │   Exception              → 500 Internal Error   │
-                    └────────────────────────────────────────────────┘
+       [ Cross-Origin Client Ingress ]
+                     │
+                     ▼ (HTTP OPTIONS / GET / POST)
+        ┌─────────────────────────┐
+        │     CORSMiddleware      │  ◄── Dynamic Origin Mirroring
+        └────────────┬────────────┘
+                     │
+                     ▼
+        ┌─────────────────────────┐
+        │ Global Exception Router │  ◄── Traps 422s ──► Translates to 400 JSON
+        └────────────┬────────────┘
+                     │
+                     ▼
+        ┌─────────────────────────┐
+        │  Asynchronous Telemetry │  ◄── Non-blocking Fire-and-Forget Thread
+        │        Middleware       │  ───► [ Centralized Logging Server ]
+        └────────────┬────────────┘
+                     │
+                     ▼
+        ┌─────────────────────────┐
+        │  FastAPI Router Engine  │
+        └──────┬──────┬──────┬────┘
+               │      │      │
+               ▼      ▼      ▼
+         [/depots] [/vehicles] [/notifications] (Strict Pydantic Bounds)
 ```
 
 ### Design Pillars
