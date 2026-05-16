@@ -76,11 +76,19 @@ System parameters are externalized via environment variables. Create a `.env` fi
 # Telemetry endpoint — overrides the built-in fallback
 LOGGING_URL=https://test-server-endpoint.com/log
 
-# Optional: Bearer token injected into telemetry request headers when present
+# Base URL for the external evaluation service
+EVALUATION_SERVICE_URL=http://4.224.186.213/evaluation-service
+
+# Bearer token used for two independent purposes:
+#   1. Authorization header on outbound telemetry log events
+#   2. Authenticated proxy calls to EVALUATION_SERVICE_URL for
+#      GET /api/depots and GET /api/vehicles
+# When absent, both paths fall back to safe local behaviour —
+# no live data is fetched and no Authorization header is sent.
 ACCESS_CODE=<your_access_code>
 ```
 
-> `ACCESS_CODE` is strictly optional. When absent, the `Authorization` header is omitted from telemetry requests entirely.
+> `ACCESS_CODE` is strictly optional. When absent, `/api/depots` and `/api/vehicles` serve the local mock dataset and telemetry requests omit the `Authorization` header entirely.
 
 ---
 
