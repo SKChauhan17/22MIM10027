@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from app.api.routers import api_router
 from app.core.logger import AffordmedLogger
 
 app = FastAPI(
@@ -35,6 +36,9 @@ async def request_logging_middleware(request: Request, call_next):
             message=f"Unhandled exception on {method} {path}: {type(exc).__name__}: {exc}",
         )
         raise
+
+
+app.include_router(api_router)
 
 
 @app.get("/health", tags=["System"])
