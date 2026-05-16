@@ -1,41 +1,95 @@
-# Campus Notifications & Vehicle Maintenance Scheduler API
+# Campus Microservices Platform
 
-A high-performance, production-grade REST API built with FastAPI for managing campus-wide notifications and scheduling preventive vehicle maintenance workflows.
+An enterprise-grade, high-throughput microservices backend engineered with **Python** and **FastAPI** to deliver robust telemetry tracking, automated notification lifecycle processing, and industrial fleet vehicle coordination across distributed campus infrastructure.
 
-## Overview
+---
 
-This service acts as the central backend for delivering real-time campus notifications and coordinating vehicle maintenance schedules. It is designed for reliability, observability, and horizontal scalability.
+## 🏗️ Architectural Topology
 
-## Tech Stack
+```
+                         ┌─────────────────────────────────────────┐
+                         │           ASGI Server (Uvicorn)         │
+                         └──────────────────┬──────────────────────┘
+                                            │
+                         ┌──────────────────▼──────────────────────┐
+                         │         CORSMiddleware  (Layer 1)        │
+                         │   Preflight orchestration & origin guard │
+                         └──────────────────┬──────────────────────┘
+                                            │
+                         ┌──────────────────▼──────────────────────┐
+                         │    Request Logging Middleware (Layer 2)  │
+                         │  Fire-and-forget telemetry via httpx     │
+                         │         AffordmedLogger ──► POST /log    │
+                         └──────────────────┬──────────────────────┘
+                                            │
+                    ┌───────────────────────▼────────────────────────┐
+                    │              FastAPI Router  /api               │
+                    │  ┌────────────┐ ┌─────────────┐ ┌──────────┐  │
+                    │  │GET /depots │ │GET /vehicles│ │GET /notifs│  │
+                    │  └────────────┘ └─────────────┘ └──────────┘  │
+                    │                   Pydantic Validation Layer     │
+                    └────────────────────────────────────────────────┘
+                                            │
+                    ┌───────────────────────▼────────────────────────┐
+                    │           Global Exception Handlers             │
+                    │   RequestValidationError → 400 Bad Request      │
+                    │   Exception              → 500 Internal Error   │
+                    └────────────────────────────────────────────────┘
+```
 
-| Layer | Technology |
-|---|---|
-| Framework | FastAPI |
-| Language | Python 3.11+ |
-| Validation | Pydantic v2 |
-| HTTP Client | HTTPX (async) |
-| Server | Uvicorn (ASGI) |
+### Design Pillars
 
-## Project Structure
+| Pillar | Implementation |
+|--------|---------------|
+| **Asynchronous Telemetry Proxy** | Every ingress request triggers a fire-and-forget `httpx` coroutine shipping a structured log event out-of-band — zero latency added to the response path |
+| **Decoupled Validation Domain** | Pydantic v2 boundaries trap malformed payloads at the network perimeter; native FastAPI 422 schemas are overridden with a unified `{ error, details[] }` contract |
+| **Cross-Origin Pipeline Isolation** | Full CORS preflight orchestration via `CORSMiddleware` positioned as the outermost application layer |
+| **Paginated Data Contracts** | Notification endpoints expose `{ total, page, limit, results[] }` envelopes enabling stateless frontend pagination |
+
+---
+
+## 📁 Project Structure
 
 ```
 .
-├── app/
-│   ├── api/         # Route handlers and endpoint definitions
-│   ├── core/        # Cross-cutting concerns (logging, config, security)
-│   ├── models/      # Pydantic data models and schemas
-│   └── services/    # Business logic and external integrations
-├── main.py          # Application entry point
+├── main.py                        # ASGI entry point; middleware & router registration
 ├── requirements.txt
-└── .gitignore
+└── app/
+    ├── api/
+    │   └── routers.py             # /api route handlers
+    ├── core/
+    │   ├── exceptions.py          # Global error handlers (400 / 500)
+    │   ├── logger.py              # AffordmedLogger async telemetry utility
+    │   └── mock_data.py           # In-memory seed data (depots, vehicles, notifications)
+    ├── models/
+    │   └── schemas.py             # Pydantic domain schemas
+    └── services/                  # Business logic layer (Phase 4+)
 ```
 
-## Setup & Installation
+---
+
+## ⚙️ Configuration & Secrets Management
+
+System parameters are externalized via environment variables. Create a `.env` file in the project root (never commit this file):
+
+```env
+# Telemetry endpoint — overrides the built-in fallback
+LOGGING_URL=https://test-server-endpoint.com/log
+
+# Optional: Bearer token injected into telemetry request headers when present
+ACCESS_CODE=<your_access_code>
+```
+
+> `ACCESS_CODE` is strictly optional. When absent, the `Authorization` header is omitted from telemetry requests entirely.
+
+---
+
+## 🛠️ Installation & Local Runtime
 
 **Prerequisites:** Python 3.11+
 
 ```bash
-# 1. Clone the repository
+# 1. Clone and enter the repository
 git clone <repository-url>
 cd <project-directory>
 
@@ -48,25 +102,98 @@ venv\Scripts\activate
 # macOS / Linux
 source venv/bin/activate
 
-# 3. Install dependencies
+# 3. Install all runtime dependencies
 pip install -r requirements.txt
 
 # 4. Configure environment variables
 cp .env.example .env
-# Edit .env with your values
 
-# 5. Start the development server
-uvicorn main:app --reload
+# 5. Boot the ASGI development server
+uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-The API will be available at `http://localhost:8000`. Interactive documentation is at `http://localhost:8000/docs`.
+---
 
-## Environment Variables
+## 📊 API Reference
 
-| Variable | Description | Default |
-|---|---|---|
-| `LOGGING_URL` | Endpoint for the centralized logging service | `https://test-server-endpoint.com/log` |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Liveness probe — returns `{"status": "ok"}` |
+| `GET` | `/api/depots` | Full depot inventory |
+| `GET` | `/api/vehicles` | Full vehicle fleet registry |
+| `GET` | `/api/notifications` | Paginated, filterable notification feed |
+| `GET` | `/docs` | Interactive Swagger UI |
+| `GET` | `/redoc` | ReDoc documentation interface |
 
-## API Reference
+### Notification Query Parameters
 
-Interactive Swagger UI documentation is auto-generated and available at `/docs` when the server is running.
+| Parameter | Type | Default | Constraints | Description |
+|-----------|------|---------|-------------|-------------|
+| `limit` | `int` | `10` | `1 ≤ x ≤ 50` | Results per page |
+| `page` | `int` | `1` | `≥ 1` | 1-based page index |
+| `notification_type` | `str` | `null` | `Alert \| Info \| Warning` | Case-insensitive type filter |
+
+**Filtered, paginated request:**
+```bash
+curl "http://127.0.0.1:8000/api/notifications?notification_type=Alert&limit=5&page=1"
+```
+
+**Response envelope:**
+```json
+{
+  "total": 8,
+  "page": 1,
+  "limit": 5,
+  "results": [ "..." ]
+}
+```
+
+---
+
+## 🔒 Error Contract
+
+All error responses conform to a uniform schema — no internal stack traces are exposed to clients.
+
+**400 Bad Request** (validation failure):
+```json
+{
+  "error": "Validation Failed",
+  "details": [
+    { "field": "query.limit", "message": "Input should be less than or equal to 50" }
+  ]
+}
+```
+
+**500 Internal Server Error:**
+```json
+{
+  "error": "Internal Server Error",
+  "message": "An unexpected error occurred."
+}
+```
+
+Perimeter validation test:
+```bash
+curl "http://127.0.0.1:8000/api/notifications?limit=abc"
+```
+
+---
+
+## 🧰 Tech Stack
+
+| Layer | Technology | Version |
+|-------|-----------|---------|
+| Language | Python | 3.11+ |
+| Web Framework | FastAPI | ≥ 0.111 |
+| Data Validation | Pydantic | v2 |
+| Async HTTP Client | HTTPX | ≥ 0.27 |
+| ASGI Server | Uvicorn | ≥ 0.29 |
+
+---
+
+## 🤝 Contributing
+
+1. Branch from `main` using `feat/<scope>` or `fix/<scope>` naming.
+2. Follow [Conventional Commits](https://www.conventionalcommits.org/) for all commit messages.
+3. Pydantic models must remain strictly typed — no `Any` fields in domain schemas.
+4. Verify `/docs` renders cleanly before opening a pull request.
