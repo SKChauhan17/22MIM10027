@@ -197,3 +197,26 @@ curl "http://127.0.0.1:8000/api/notifications?limit=abc"
 2. Follow [Conventional Commits](https://www.conventionalcommits.org/) for all commit messages.
 3. Pydantic models must remain strictly typed — no `Any` fields in domain schemas.
 4. Verify `/docs` renders cleanly before opening a pull request.
+
+---
+
+## 📸 Execution Verification Matrix
+
+### 1. Core Inventory Endpoints (`GET /api/depots` & `GET /api/vehicles`)
+
+The endpoints resolve the target inventory datasets dynamically using a robust authenticated reverse proxy layer, safely maintaining local dataset fallbacks for high-availability execution.
+
+![Depots Matrix](assets/Screenshot%20(189).png)
+![Vehicles Inventory](assets/Screenshot%20(192).png)
+
+### 2. Notifications Pagination & Type Filtering Gateway
+
+Demonstrates automated parameter slicing arrays dynamically based on limit and page index scopes alongside case-insensitive matching filters.
+
+![Pagination & Filtering Rules](assets/Screenshot%20(196).png)
+
+### 3. Perimeter Validation Injection Testing (`limit=abc`)
+
+Demonstrates our custom validation exception router catching runtime data mismatches at the gate and uniformizing default 422 processing states into clean HTTP 400 Bad Request contracts.
+
+![Validation Perimeter Control](assets/Screenshot%20(201).png)
